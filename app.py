@@ -1,59 +1,64 @@
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask import Flask, jsonify, request
 import os
-from datetime import datetime
 import stripe
+from datetime import datetime
 
-stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "sk_test_YOUR_KEY_HERE")  # Change later
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
 app = Flask(__name__)
 
-PRODUCTS = [
-    {"id": 1, "name": "Rechargeable Handheld Turbo Fan", "price": 29.99, "original_price": 49.99, "description": "Powerful portable fan for summer heat.", "image": "fan.jpg", "category": "Cooling"},
-    {"id": 2, "name": "Self-Cooling Pet Mat", "price": 34.99, "original_price": 59.99, "description": "Keeps pets cool in hot weather.", "image": "petmat.jpg", "category": "Pet"},
-    {"id": 3, "name": "Waterproof Floating Phone Pouch", "price": 19.99, "original_price": 29.99, "description": "Protect your phone at beach/pool.", "image": "pouch.jpg", "category": "Travel"},
-    {"id": 4, "name": "Sand-Free Beach Blanket", "price": 39.99, "original_price": 59.99, "description": "Lightweight beach blanket.", "image": "blanket.jpg", "category": "Beach"},
-    {"id": 5, "name": "Portable Neck Fan", "price": 27.99, "original_price": 44.99, "description": "Hands-free personal cooling.", "image": "neckfan.jpg", "category": "Cooling"},
-    {"id": 6, "name": "Posture Corrector Brace", "price": 24.99, "original_price": 39.99, "description": "Improves posture instantly.", "image": "posture.jpg", "category": "Wellness"}
-]
-
-orders = []
-
 @app.route('/')
-def index():
-    return render_template('index.html', products=PRODUCTS)
+def home():
+    return """
+    <h1>Summer Vibes Dropshipping Store</h1>
+    <p>Live on Render with Stripe!</p>
+    <p><a href='/test-payment'>Test Payment</a></p>
+    """
 
-@app.route('/product/<int:product_id>')
-def product_detail(product_id):
-    product = next((p for p in PRODUCTS if p['id'] == product_id), None)
-    if not product:
-        return "Not found", 404
-    return render_template('product.html', product=product)
+@app.route('/test-payment')
+def test_payment():
+    return """
+    <h1>Test Stripe Payment</h1>
+    <button onclick="startPayment()">Pay $29.99</button>
+    <script>
+    function startPayment() {
+        fetch('/create-checkout-session', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({items: [{name: 'Turbo Fan', price: 29.99}]})
+        }).then(r => r.json()).then(data => {
+            if (data.url) window.location.href = data.url;
+        });
+    }
+    </script>
+    """
 
 @app.route('/create-checkout-session', methods=['POST'])
 def create_checkout_session():
     try:
         data = request.json
-        items = data.get('items', [])
-        line_items = []
-        for item in items:
-            line_items.append({
-                'price_data': {
-                    'currency': 'usd',
-                    'product_data': {'name': item['name']},
-                    'unit_amount': int(item['price'] * 100),
-                },
-                'quantity': 1,
-            })
         session = stripe.checkout.Session.create(
             payment_method_types=['card'],
-            line_items=line_items,
+            line_items=[{
+                'price_data': {
+                    'currency': 'usd',
+                    'product_data': {'name': data['items'][0]['name']},
+                    'unit_amount': int(data['items'][0]['price'] * 100),
+                },
+                'quantity': 1,
+            }],
             mode='payment',
-            success_url='https://your-render-url/success',
-            cancel_url='https://your-render-url/',
+            success_url='https://the-collective-bn46.onrender.com/success',
+            cancel_url='https://the-collective-bn46.onrender.com/',
         )
         return jsonify({'url': session.url})
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
+@app.route('/success')
+def success():
+    return "<h1>✅ Payment Successful! Thank you.</h1><p>Your dropshipping order is processing.</p>"
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
