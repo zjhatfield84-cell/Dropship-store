@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ product.name }}</title>
+    <style>body{font-family:Arial;padding:20px;}</style>
+</head>
+<body>
+    <h1>{{ product.name }}</h1>
+    <p>Price: ${{ product.price }}</p>
+    <p>{{ product.description }}</p>
+    <button onclick="buyNow()">Buy with Stripe</button>
+    <script>
+    function buyNow() {
+        const email = prompt("Your email:");
+        fetch('/create-checkout-session', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({items: [{name: "{{ product.name }}", price: {{ product.price }}}], customer: {email}})
+        }).then(r => r.json()).then(data => {
+            if (data.url) window.location.href = data.url;
+        });
+    }
+    </script>
+</body>
+</html>
